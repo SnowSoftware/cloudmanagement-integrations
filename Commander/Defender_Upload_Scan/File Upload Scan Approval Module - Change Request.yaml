@@ -1,0 +1,68 @@
+---
+id: 82
+guid: "0ac29ff2-ef28-4482-b9b7-ca6de50bce36"
+name: "File Upload Scan Approval Module - Change Request"
+description: "Approval Workflow module that scans uploaded files in Change Requests\
+  \ for threats using Windows Defender on the Commander host. Files uploaded using\
+  \ the \"File Upload\" form element in Change Request will be scanned. "
+type: "CHANGE_APPROVAL"
+change_description: null
+target_type: null
+input_variables:
+- name: "File Names Input"
+  variable: "file_names"
+  description: "This field needs to be populated with this variable:\n#{target.settings.uploadedFile['Uploaded\
+    \ Files']}\n\nReplace the 'Upload Files' value with your File Upload field name."
+  required: true
+  default_value: null
+info_messages: []
+system_version: "9.0.0 (1007160158)"
+steps:
+- name: "Scan Uploaded Files"
+  type: "EMBEDDED_SCRIPT"
+  condition: null
+  data:
+    credentials: null
+    failure_action: "FAIL_STEP"
+    script_contents: "#How it Works:\n# We scan the upload directory with Windows\
+      \ Defender. We then check the detected threats and see if any match the files\
+      \ we\n# uploaded.\n# If any match, we fail the workflow. \n# No remediation\
+      \ of threats is requried as Windows Defender will quarantene or delete the files\
+      \ on it's own.\n\n#get the datetime of the service request\n$requstDateTimeString\
+      \ = \"#{request.requestDate}\"\n$requstDateTime = Get-Date -Date $requstDateTimeString\n\
+      \n#subtract 5 minutes from the request time and save the new time. We use this\
+      \ time to compare to the detection time of the threats so that\n# we can find\
+      \ items uploaded as part of the service request but won't find items which are\
+      \ much older.\n$checkedTime = $requstDateTime.AddMinutes(-5)\n\n#set the path\
+      \ to files, default path is \\<commander install folder>\\tomcat\\temp\n$uploadFilePath\
+      \ = \"#{system.directory}\\temp\"\n\n#get the list of filenames from the request\
+      \ as a comma separated list\n$fileNameString =  \"#{inputVariable['file_names']}\"\
+      \n\n#split the list into an array of strings\n$fileNameArray = $fileNameString.Split(',')\n\
+      \n#validate that we have files to process\nif($fileNameArray.Length -lt 1)\n\
+      {\n    #no files are present, exit the script with a success condition\n   \
+      \ write-host \"No files were provided for scanning, workflow will exit\"\n \
+      \   Exit 0\n}\n\n#invoke the scanner on the tomcat temp folder. This will detect\
+      \ any issues with the uploaded files\nStart-MpScan -ScanType CustomScan -ScanPath\
+      \ $uploadFilePath\n\n#get the current threat history\n$threatHistory = Get-MpThreatDetection\n\
+      \n#for each file, invoke the scanner\nforeach($fileName in ($fileNameArray |\
+      \ where {$_.Trim() -notlike \"\"}))\n{\n    $threatDetected = $false\n    #trim\
+      \ the filename for whitespace\n    $trimmedName = $fileName.Trim()\n    #look\
+      \ up the file\n    $individualFilePath = \"$uploadFilePath\\$trimmedName\"\n\
+      \    \n    write-host \"Checking threat history for $individualFilePath\"\n\n\
+      \    #look for the file in the threat history\n    foreach($threat in $threatHistory)\n\
+      \    {\n        \n        #if the uploaded file appears as a resource in the\
+      \ threat, we found a match\n        # We only observe issues which are found\
+      \ after the files were uploaded as part of the request to eliminate false positives\
+      \ on old files with the same name\n        if(($threat.Resources | where{$_.contains($individualFilePath)})\
+      \ -and ($threat.InitialDetectionTime -ge $checkedTime))\n        {         \
+      \   \n            #set error flags\n            $threatDetected = $true\n  \
+      \          $scanError = $true\n        }\n    }\n\n    if($threatDetected -eq\
+      \ $true)\n    {\n        #write an error message\n        write-host \"An issue\
+      \ was found in $trimmedName\"\n    }\n\n}\n\n#if errors are detected\nif($scanError\
+      \ -eq $true)\n{\n    #exit with error\n    write-host \"Some files contained\
+      \ issues, this workflow will terminate\"\n    Exit 1\n\n}\n\nwrite-host \"No\
+      \ threats were detected\"\n\n\n"
+    script_arguments: ""
+    timeout: 300
+    executable: "powershell.exe"
+    capture_output: true
