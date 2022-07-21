@@ -1,0 +1,113 @@
+{
+  "id": 101,
+  "guid": "03b356ea-ca87-45a9-86a1-f9884dc7d0e3",
+  "name": "Join Domain - WinRM",
+  "description": "Joins the a domain then reboots the target. ",
+  "type": "COMPONENT_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [
+    {
+      "name": "Domain Credential Name",
+      "variable": "DomainCredName",
+      "description": "Credential in the commander library which will be used to join the domain in the PSSession with the target VM/Instance",
+      "required": true,
+      "default_value": "domainCredName"
+    },
+    {
+      "name": "Domain to Join",
+      "variable": "DomaintoJoin",
+      "description": "fqdn of the domain to join the target VM/Instance to, the VM must be able to resolve DNS for this domain. ",
+      "required": true,
+      "default_value": "domain.local"
+    },
+    {
+      "name": "VM Template Credential Name",
+      "variable": "vmCredname",
+      "description": "Credential in the commander library which will be used to initiate the PSSession with the target VM/Instance",
+      "required": true,
+      "default_value": "Image Credential"
+    },
+    {
+      "name": "ByPass Certificate",
+      "variable": "BypassCert",
+      "description": "Bypass any unsigned certificate when making API calls Values: {Yes:No}",
+      "required": true,
+      "default_value": "Yes"
+    }
+  ],
+  "info_messages": [],
+  "system_version": "9.0.1 (1007160167)",
+  "steps": [
+    {
+      "name": "Execute Join Domain Command",
+      "type": "EMBEDDED_SCRIPT",
+      "condition": null,
+      "data": {
+        "credentials": null,
+        "failure_action": "FAIL_STEP",
+        "script_contents": "<#\nWinRM join domain Module, requires the target to be configured to accept WinRM requests. \nIt's recommended that you set the firewall to the commander server only unless required otherwise\nUsed to run winRM on non-domain joined hosts by IP. After the target host has been joined to the domain it's \nrecommended that the domain GPO or workflow disable unencrypted winRM on the target.\n#> \n\n#Commander Base Configuration\n$BaseURL = 'https://localhost'\n$Commanderuser = (Get-Item Env:SELECTED_CREDENTIALS_USERNAME).value;\n$Commanderpass = (Get-Item Env:SELECTED_CREDENTIALS_PASSWORD).value;\n$BypassCert = \"#{inputVariable['BypassCert']}\" \n\n#VM credential\n$vmCredName = \"#{inputVariable['vmCredname']}\"     #Cred name in the commander credential library\n\n#Domain, Credential and target\n$DomaintoJoin = \"#{inputVariable['DomaintoJoin']}\"\n$TargetAddress = \"#{target.ipv4Addresses}\" \n$Domaincredname = \"#{inputVariable['DomainCredName']}\"      #Cred name in the commander credential library\n\n#########################################################################################################\n#Set-StrictMode -Version 3.0\n$ErrorActionPreference = \"Stop\"\n\nif (!($TargetAddress) -or !($domaincredname) -or !($vmCredName) -or !($DomaintoJoin)) {\n        Write-error \"Please provide Image and Domain information\"\n        Exit 1\n        }\n\nif(!($BaseURL) -or !($Commanderuser) -or !($Commanderpass) -or !($BypassCert)){\n        Write-error \"Please provide Commander information\"\n        Exit 1\n        }\n\n\n#ignore Commander unsigned Certificate\nif ($BypassCert -eq \"Yes\"){\n    Write-host \"- Ignoring invalid Certificate\" -ForegroundColor Green\n\nadd-type @\"\n   using System.Net;\n    using System.Security.Cryptography.X509Certificates;\n    public class TrustAllCertsPolicy : ICertificatePolicy {\n        public bool CheckValidationResult(\n            ServicePoint srvPoint, X509Certificate certificate,\n            WebRequest request, int certificateProblem) {\n            return true;\n        }\n    }\n\"@\n    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n}\n\n#Get Auth Token\n    $Token = $null\n    $TokenEndpoint = \"/rest/v3/tokens\"\n    $TokenURL = $BaseURL+$TokenEndpoint\n    $TokenBody = \"{\n                \"\"username\"\": \"\"$Commanderuser\"\",\n                \"\"password\"\": \"\"$Commanderpass\"\" \n                }\"\n    $TokenResult = Invoke-RestMethod -Method POST $TokenURL -Body $TokenBody -ContentType 'application/json'\n    $Token = $TokenResult.token\n    $AuthHeader = @{\"Authorization\"= \"Bearer $Token\"}\n\n#Get Template Credential\n     Try{\n         $vmcredurl = $BaseURL+\"/rest/v3/credentials/$vmcredname\"   \n         $vmcred = Invoke-RestMethod -Method GET $vmcredurl -Headers $AuthHeader -ContentType 'application/json'\n         $vmcreds = $vmcred.password_credential\n         $vmusername = $vmcreds.username \n         $vmpassword = $vmcreds.password | ConvertTo-SecureString -AsPlainText -Force\n         $vmcredential = New-Object System.Management.Automation.PSCredential($vmusername, $vmpassword)\n        }\n         Catch{\n             $Exception = \"$_\"\n             Write-Error \"Failed to get credential named $vmcredname from credentials in commander.. Does it exist?\"\n             Write-Error $Exception\n             Exit 1   \n         } \n\n#Get Domain Credential\n     Try{\n         $credurl = $BaseURL+\"/rest/v3/credentials/$domaincredname\"   \n         $cred = Invoke-RestMethod -Method GET $credurl -Headers $AuthHeader -ContentType 'application/json'\n         $creds = $cred.password_credential\n         $Domainusername = $creds.username \n         $Domainpassword = $creds.password \n        }\n         Catch{\n             $Exception = \"$_\"\n             Write-Error \"Failed to get credential named $domaincredname from credentials in commander.. Does it exist?\"\n             Write-Error $Exception\n             Exit 1   \n         } \n\n\n#Open pssession to targetVM\n    $session = new-pssession -ComputerName $TargetAddress -Credential $vmcredential\n    $result = invoke-command -session $session -ScriptBlock {   \n        #Parameters List\n        param ($DomaintoJoin, $Domainusername, $Domainpassword)    \n        #Set executionpolicy to bypass warnings in this session\n        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process\n        #Domain cred\n            $Domainpassword | ConvertTo-SecureString -AsPlainText -Force\n            $Domaincred = New-Object System.Management.Automation.PSCredential($Domainusername, $Domainpassword)\n        #Join Domain\n        try {\n            $hostname = hostname\n            Write-host \"Domain: $DomaintoJoin\"\n            Add-Computer -ComputerName $hostname -Credential $Domaincred -DomainName $DomaintoJoin -Confirm:$false #  -Restart\n        } catch {\n            $err =$_.Exception\n            Write-Host $err.Message\n          }\n    } -ArgumentList ($DomaintoJoin, $Domainusername, $Domainpassword)\n\nRemove-PSSession $TargetAddress",
+        "script_arguments": "",
+        "timeout": 300,
+        "executable": "powershell.exe",
+        "capture_output": true
+      }
+    },
+    {
+      "name": "Shutdown VM",
+      "type": "POWER",
+      "condition": "#{target.state} -ne \"Not Running\"",
+      "data": {
+        "power_action": "START_VM"
+      }
+    },
+    {
+      "name": "Wait for VM Instance to power off",
+      "type": "WAIT",
+      "condition": null,
+      "data": {
+        "failure_action": "PROCEED_TO_NEXT_STEP",
+        "wait_for_type": "POWER_OFF",
+        "timeout": 400
+      }
+    },
+    {
+      "name": "Start the Target Service",
+      "type": "POWER",
+      "condition": "#{target.state} -ne \"Running\"",
+      "data": {
+        "power_action": "START_VM"
+      }
+    },
+    {
+      "name": "Wait target to be ready(vmware)",
+      "type": "WAIT",
+      "condition": "#{target.cloudAccount.type} -eq \"vc\"",
+      "data": {
+        "failure_action": "FAIL_STEP",
+        "wait_for_type": "IP_AND_DNS",
+        "timeout": 300
+      }
+    },
+    {
+      "name": "Wait target to be ready(Azure)",
+      "type": "WAIT",
+      "condition": "#{target.cloudAccount.type} -eq \"ms_arm\"",
+      "data": {
+        "failure_action": "FAIL_STEP",
+        "wait_for_type": "POWER_ON",
+        "timeout": 300
+      }
+    },
+    {
+      "name": "Wait target to be ready(AWS)",
+      "type": "WAIT",
+      "condition": "#{target.cloudAccount.type} -eq \"amazon_aws\"",
+      "data": {
+        "failure_action": "FAIL_STEP",
+        "wait_for_type": "GUEST_OS_ON",
+        "timeout": 300
+      }
+    }
+  ]
+}
