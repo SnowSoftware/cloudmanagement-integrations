@@ -11,7 +11,7 @@
 * Import the required Module
 
 ## Installation and Setup
-* Run the server config.ps1 on the commander server 
+* Run the server_config.ps1 on the commander server 
 * Run the Template_client_config.ps1 on the template or image that's going to be deployed by commander.
 * Create three "Guest OS" credentials in the commander Credential library. One for Template credentials, one for Joining the domain and one to call the commander API(superuser).  
 * Import the Module "Join Domain - WinRM.json" and configure it's Input variables with Domain name and the credential object names. 
