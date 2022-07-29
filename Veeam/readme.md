@@ -1,9 +1,13 @@
-# Veeam placeholder
+# Veeam Backup and Recovery 11 - Integration
+
+Modules that allow a user to add a vm to a backup job as part of deployment or as an adhoc "Backup Now"
 
 Requirements
- - Requires PS module AZ on the Commander server.
+ - Requires Veeam Backup and Recovery Console on the Commander server.
  - Commander 8.9.0 or higher
  - Advanced property "embotics.workflow.script.credentials" must be set to "true"
+
+Dynamic List for Form based Selection
 
 ## Completion modules
 *  

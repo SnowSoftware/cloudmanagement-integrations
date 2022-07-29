@@ -1,4 +1,4 @@
-# Commander - Update public CLoud List pricing
+# Commander - Update public Cloud List pricing
 
 Command Workflow Module, which pulls the latest List pricing and reloads the Costs via API
 
