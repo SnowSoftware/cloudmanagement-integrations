@@ -1,0 +1,50 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Add to Veeam Backup Job",
+  "description": null,
+  "type": "COMPONENT_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [
+    {
+      "name": "Veeam Server",
+      "variable": "vbrServer",
+      "description": "Veeam Server IP address or FQDN",
+      "required": true,
+      "default_value": "0.0.0.0"
+    },
+    {
+      "name": "Veeam Backup Job",
+      "variable": "vbrJobName",
+      "description": "Backup Job to assign the Target. ",
+      "required": true,
+      "default_value": null
+    },
+    {
+      "name": "Veeam Port",
+      "variable": "vbrPort",
+      "description": "Veeam Port for Connectivity (Default is 9392)",
+      "required": true,
+      "default_value": null
+    }
+  ],
+  "info_messages": [],
+  "system_version": "9.0.1 (1007160167)",
+  "steps": [
+    {
+      "name": "Run add to Backup Job",
+      "type": "EMBEDDED_SCRIPT",
+      "condition": null,
+      "data": {
+        "credentials": null,
+        "failure_action": "FAIL_STEP",
+        "script_contents": "<#\nRequirements\n- In Snow Commander the Advanced Property “embotics.workflow.script.credentials” must be set to true.\n- In some cases the Execution Policy on the Commander Server must be set to “Unrestricted”\n- Commander 8.10.6 or greater\n- Minimum Veeam Backup and Recovery Console 11 on the Commander server.\n#>\n\n#Veeam Configuration\n$VBRServer = \"#{inputVariable['vbrServer']}\"\n$VBRport = \"#{inputVariable['vbrPort']}\" #Default port is 9392\n$vBRusername = (Get-Item Env:SELECTED_CREDENTIALS_USERNAME).value;\n$vBRpassword = (Get-Item Env:SELECTED_CREDENTIALS_PASSWORD).value\n$Modules = \"Veeam.Backup.PowerShell\"\n$BypassCert = \"Yes\"\n$Jobname = \"#{inputVariable['vbrJobName']}\"\n$VMDetails = \"#{target.deployedName}\"\n\n#Check to make sure required information is present\nif (!($vBRusername) -or !($vBRpassword) -or !($VBRServer) -or !($VBRport) -or !($Jobname) -or !($BypassCert)) {\n    Write-error \"Please provide required information to connect to Veeam\"\n    Exit 1\n} \n\n$ErrorActionPreference = \"STOP\"\n\n#Check for PS Module\nForEach ($module in $modules) {\n    if (Get-Module -ListAvailable -Name $Module) {\n        Import-Module $module -WarningAction Ignore\n        Write-Debug \"Module $Module is installed.\"\n    } \n    else {\n        Write-Error \"Module $module does not appear to be installed, Please install and run again.\"\n        Exit 1\n    }\n}\n\n#Bypass unsigned Certificates\nif ($BypassCert -eq \"yes\") {\n    Write-host \"- Ignoring invalid Certificate\" -ForegroundColor Green\n    add-type @\"\n   using System.Net;\n    using System.Security.Cryptography.X509Certificates;\n    public class TrustAllCertsPolicy : ICertificatePolicy {\n        public bool CheckValidationResult(\n            ServicePoint srvPoint, X509Certificate certificate,\n            WebRequest request, int certificateProblem) {\n            return true;\n        }\n    }\n\"@\n    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n    [Net.ServicePointManager]::Expect100Continue = $true\n    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12\n}\n\n#Connect to vBRserver\n$secpassword = $vBRpassword | ConvertTo-SecureString -AsPlainText -Force\n$vBRcred = New-Object System.Management.Automation.PSCredential($vBRusername, $secpassword)\nConnect-VBRServer -Server $VBRServer -Port $VBRport -Credential $vBRCred\n$vBRSession = Get-VBRServerSession\nif ($vBRSession.Server -eq $VBRServer) {\n    Write-host \"Connected to Veeam Server at address: $VBRServer\"\n} \nif (!$vBRSession.Server) {\n    Write-host \"Not Connected to $VBRServer, Please contact your Administrator\"\n    Exit 1\n}\n\n#Check if job exists\n$vbrJobs = (Get-VBRJob).name\nif ($vbrJobs -notcontains $Jobname) {\n    Write-host \"Backup job '$jobname' doesn't exist on the server, please contact your administrator\"\n    Disconnect-VBRServer\n    Exit 1\n}\n    \n#Add VM to Backup Job\n$vmEntity = Find-VBRViEntity -name $VMDetails\nIF (!$vmEntity) {\n    Write-host \"No vm found with the name: $VMDetails\" -foreground \"red\"\n    Disconnect-VBRServer\n    Exit 1\n}\n$AddResult = Add-VBRViJobObject -Job $Jobname -Entities $vmEntity -Force -WarningAction Ignore\n\n#Check job for added VM\n$jobobject = $jobname | Get-VBRJobObject | where { $_.name -match $vmEntity.name }\nIf ($jobobject.Name -eq $VMDetails) {\n    Write-host \"'$VMDetails' succesfully added to backup job: $jobname\"\n    Disconnect-VBRServer\n}\nElseif (!$jobobject) {\n    Write-Error \"'$VMDetails' succesfully added to backup job: $jobname\"\n    Disconnect-VBRServer\n    Exit 1\n}\nElse {\n    Write-Error \"Something has gone wrong, Please contact your system administrator\"\n    Disconnect-VBRServer\n}\n\n",
+        "script_arguments": "",
+        "timeout": 300,
+        "executable": "powershell.exe",
+        "capture_output": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Run Quick Backup",
+  "type": "COMMAND",
+  "change_description": null,
+  "fulfillment_rule": null,
+  "add_owner_as_admin": false,
+  "auto_deploy": false,
+  "users": [],
+  "organizations": [],
+  "target_type": "VIRTUAL_MACHINE",
+  "info_messages": [],
+  "prompt_message": "This will submit a quick Backup job, if the target is not assigned to a job or doesn't have a full backup this command will fail. ",
+  "system_version": "9.0.1 (1007160167)",
+  "steps": [
+    {
+      "name": "Run QuickBackup",
+      "type": "EMBEDDED_SCRIPT",
+      "condition": null,
+      "data": {
+        "credentials": null,
+        "failure_action": "FAIL_STEP",
+        "script_contents": "<#\nRequirements\n- In Snow Commander the Advanced Property “embotics.workflow.script.credentials” must be set to true.\n- In Snow Commander the Advanced Property “embotics.rest.credentials.retrievsensitive” must be set to true.\n- In some cases the Execution Policy on the Commander Server must be set to “Unrestricted”\n- Commander 8.10.6 or greater\n- Minimum Veeam Backup and Recovery Console 11 on the Commander server.\n#>\n\n#Veeam Configuration\n$VBRServer = \"x.x.x.x\"\n$VBRport = \"9392\"\n$vBRusername = (Get-Item Env:SELECTED_CREDENTIALS_USERNAME).value;\n$vBRpassword = (Get-Item Env:SELECTED_CREDENTIALS_PASSWORD).value\n$Modules = \"Veeam.Backup.PowerShell\"\n$BypassCert = \"Yes\"\n$VMDetails = \"#{target.deployedName}\"\n\n#Check to make sure required information is present\nif(!($vBRusername) -or !($vBRpassword) -or !($VBRServer) -or !($VBRport) -or !($Jobname) -or !($BypassCert)){\n        Write-error \"Please provide required information to connect to Veeam\"\n        Exit 1\n        } \n\n$ErrorActionPreference = \"STOP\"\n\n#Check for PS Module\nForEach($module in $modules){\n    if (Get-Module -ListAvailable -Name $Module) {\n        Import-Module $module -WarningAction Ignore\n        Write-Debug \"Module $Module is installed.\"\n    } \n    else {\n        Write-Error \"Module $module does not appear to be installed, Please install and run again.\"\n        Exit 1\n    }\n}\n\n#Bypass unsigned Certificates\nif ($BypassCert -eq \"yes\") {\n    Write-host \"- Ignoring invalid Certificate\" -ForegroundColor Green\n    add-type @\"\n   using System.Net;\n    using System.Security.Cryptography.X509Certificates;\n    public class TrustAllCertsPolicy : ICertificatePolicy {\n        public bool CheckValidationResult(\n            ServicePoint srvPoint, X509Certificate certificate,\n            WebRequest request, int certificateProblem) {\n            return true;\n        }\n    }\n\"@\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\n[Net.ServicePointManager]::Expect100Continue = $true\n[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12\n}\n\n#Connect to vBRserver\n    $secpassword = $vBRpassword | ConvertTo-SecureString -AsPlainText -Force\n    $vBRcred = New-Object System.Management.Automation.PSCredential($vBRusername, $secpassword)\n    Connect-VBRServer -Server $VBRServer -Port $VBRport -Credential $vBRCred\n    $vBRSession = Get-VBRServerSession\n    if($vBRSession.Server -eq $VBRServer){\n        Write-host \"Connected to Veeam Server at address: $VBRServer\"\n        } \n    if(!$vBRSession.Server){\n        Write-host \"Not Connected to $VBRServer, Please contact your Administrator\"\n        Exit 1\n        }\n\n  \n#Start Quick Backup\n    $vmEntity = Find-VBRViEntity -name $VMDetails\n    IF(!$vmEntity){\n        Write-host \"No vm found with the name: $VMDetails\" -foreground \"red\"\n        Disconnect-VBRServer\n        Exit 1\n    }\n    Start-VBRQuickBackup -VM $vmEntity -WarningAction Ignore\n    $Result = $?\n    if($Result -eq \"True\"){\n        Write-host \"Quick Backup was submitted sucessfully\"\n        Disconnect-VBRServer\n        Exit 0\n    }\n    If($Result -eq \"False\"){\n        Write-Error \"Failed to Submit Quick Backup for $VMDetails\"\n        Disconnect-VBRServer\n        Exit 1\n    }\n    Else{\n        Write-Error \"Somehting has gone wrong, Please contact your System Administrator\"\n        Disconnect-VBRServer\n        Exit 1\n    }",
+        "script_arguments": "",
+        "timeout": 300,
+        "executable": "powershell.exe",
+        "capture_output": true
+      }
+    }
+  ]
+}
