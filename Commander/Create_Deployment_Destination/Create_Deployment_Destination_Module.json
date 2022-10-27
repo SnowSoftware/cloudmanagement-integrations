@@ -1,0 +1,71 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Commander - Create a Deployment Destination",
+  "description": null,
+  "type": "CUSTOM_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [
+    {
+      "name": "Commander User",
+      "variable": "localUser",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "Deployment Destination Name",
+      "variable": "destName",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "Cloud Account Name",
+      "variable": "cloudName",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "Base URL",
+      "variable": "BaseURL",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "Organization Name",
+      "variable": "org",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "ByPass Cert",
+      "variable": "ByPassCert",
+      "description": null,
+      "required": false,
+      "default_value": null
+    }
+  ],
+  "info_messages": [],
+  "system_version": "9.0.0 (1007160158)",
+  "steps": [
+    {
+      "name": "Create Commander Deployment Destination",
+      "type": "EMBEDDED_SCRIPT",
+      "condition": null,
+      "data": {
+        "credentials": null,
+        "failure_action": "FAIL_STEP",
+        "script_contents": "$BaseURL = \"#{inputVariable['BaseURL']}\" \n$user = (Get-Item Env:COMMANDER_CREDENTIALS_USERNAME).value; \n$pass= (Get-Item Env:COMMANDER_CREDENTIALS_PASSWORD).value; \n$BypassCert = \"#{inputVariable['ByPassCert']}\" \n$cloudname = \"#{inputVariable['cloudName']}\" \n$destname = \"#{inputVariable['destName']}t\" \n$org = \"#{inputVariable['org']}\" \n$localuser = \"#{inputVariable['localUser']}\" \n \n #Check All Variables Presenta \nif (!($BaseURL ) -or !($user) -or !($pass) -or !($BypassCert)) { \n        Write-error \"Please provide all required input variables to execute this workflow\" \n        Exit 1}  \n \n#$DebugPreference=\"Continue\" \n$ErrorActionPreference = \"Stop\" \n \n \n#Bypass unsigned SSL for Localhost \nif ($BypassCert -eq \"yes\") { \n    Write-host \"- Ignoring invalid Certificate\" -ForegroundColor Green \n    add-type @\" \n   using System.Net; \n    using System.Security.Cryptography.X509Certificates; \n    public class TrustAllCertsPolicy : ICertificatePolicy { \n        public bool CheckValidationResult( \n            ServicePoint srvPoint, X509Certificate certificate, \n            WebRequest request, int certificateProblem) { \n            return true; \n        } \n    } \n\"@ \n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy \n[Net.ServicePointManager]::Expect100Continue = $true \n[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 \n} \n \n#Get Auth Token  \n    $Token = $null  \n    $TokenEndpoint = \"/rest/v3/tokens\"  \n    $TokenURL = $BaseURL+$TokenEndpoint  \n    $TokenBody = \"{  \n                \"\"username\"\": \"\"$user\"\",  \n                \"\"password\"\": \"\"$pass\"\"   \n                }\"  \n    $TokenResult = Invoke-RestMethod -Method POST $TokenURL -Body $TokenBody -ContentType 'application/json'  \n    $Token = $TokenResult.token  \n    $AuthHeader = @{\"Authorization\"= \"Bearer $Token\"}  \n \n \n  Try{ \n         $cloudaccount = $BaseURL+\"/rest/v3/cloud-accounts?filter=name -eq \"\"$cloudname\"\" \" \n         $subnetaccount = $BaseURL+\"/rest/v3/subnets?filter=cloud_account_name -eq \"\"$cloudname\"\" \" \n         $resourcename = $BaseURL+\"/rest/v3/resource-groups?filter=cloud_account_name -eq \"\"$cloudname\"\" \" \n         $cloud = Invoke-RestMethod -Method GET $cloudaccount -Headers $AuthHeader -ContentType 'application/json' \n         $subnet = Invoke-RestMethod -Method GET $subnetaccount -Headers $AuthHeader -ContentType 'application/json' \n         $resource = Invoke-RestMethod -Method GET $resourcename -Headers $AuthHeader -ContentType 'application/json' \n         $cloudaccountID = $cloud.items.id \n         $subnetID = $subnet.items.id[1] \n         $resourcegroupID = $resource.items.id[1] \n         $datastoreaccount = $BaseURL+\"/rest/v3/datastores?filter=resource_group_id -eq \"\"$resourcegroupID\"\" \" \n         $datastore = Invoke-RestMethod -Method GET $datastoreaccount -Headers $AuthHeader -ContentType 'application/json' \n         $datastoreID = $datastore.items.id[1] \n         Write-Output \"Successfully fetched Cloud Account details for $cloudname; now creating..\" \n         Catch{ \n             $Exception = \"$_\" \n             Write-Error \"Failed to get cloud account called $cloudname from Commander.. Does it exist?\" \n             Write-Error $Exception \n             Exit 1 \n         } \n            #Refresh JWT Token  \n            $refreshEndpoint = \"/rest/v3/tokens/refresh\" \n            $refreshURL = $BaseURL+$refreshEndpoint \n            $refreshBody = \"{ \n                        \"\"token\"\": \"\"$token\"\" \n                        }\" \n            $refreshResult = Invoke-RestMethod -Method POST $refreshURL -Body $refreshBody -ContentType 'application/json' \n            $Token = $refreshResult.token \n            $AuthHeader = @{\"Authorization\"= \"Bearer $Token\"} \n  ######################JSON Body############################### \n  $jsonbody = @\" \n { \n    \"name\": \"$destname\", \n    \"cloud_account\":  \n{ \n    \"id\": \"$cloudaccountID\" \n}, \n\"target\":  \n{ \n    \"id\": \"$resourcegroupID\", \n    \"type\": \"RESOURCE_GROUP\" \n}, \n\"users\":  \n[ \n    \"$localuser\" \n], \n\"organizations\":  \n[ \n    \"$org\" \n], \n\"microsoft_azure\": { \n\"diagnostics_storage_account\": null, \n\"subnets\":  \n[ \n    { \n        \"id\": \"$subnetID\" \n    } \n], \n\"datastores\":  \n[ \n        { \n            \"id\": \"$datastoreID\" \n        } \n    ] \n} \n} \n\"@ \n$json = $jsonbody | ConvertTo-Json \nTry{ \n         $destination = $BaseURL+\"/rest/v3/deployment-destinations\" \n         $desturl = Invoke-RestMethod -Method POST $destination -Body $jsonbody -Headers $AuthHeader -ContentType 'application/json' \n         write-host \"Successfully created deployment destination $destname - to review please navigate to Configuration > Self-Service > Provisioning\" \n        } \n         Catch{ \n             $Exception = \"$_\" \n             Write-Error \"Failed to create Destination from Commander.. Are those details correct?\" \n             Write-Error $Exception \n             Exit 1 \n         }",
+        "script_arguments": "",
+        "timeout": 300,
+        "executable": "powershell.exe",
+        "capture_output": true
+      }
+    }
+  ]
+}

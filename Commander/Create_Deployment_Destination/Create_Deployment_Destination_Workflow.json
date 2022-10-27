@@ -1,0 +1,32 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Create Deployment Destination",
+  "type": "CUSTOM_COMPLETION",
+  "change_description": null,
+  "fulfillment_rule": null,
+  "add_owner_as_admin": false,
+  "auto_deploy": false,
+  "users": [],
+  "organizations": [],
+  "target_type": null,
+  "info_messages": [],
+  "prompt_message": null,
+  "system_version": "9.0.0 (1007160158)",
+  "steps": [
+    {
+      "name": "Deployment Destination creation",
+      "type": "MODULE",
+      "condition": null,
+      "data": {
+        "destName": "<yourUniqueDesName>",
+        "org": "#{request.requester.organization.name}",
+        "cloudName": "<yourCloudAccount>",
+        "module_name": "Commander - Create a Deployment Destination",
+        "BaseURL": "app1.domain.local",
+        "localUser": "manager",
+        "ByPassCert": "yes"
+      }
+    }
+  ]
+}
