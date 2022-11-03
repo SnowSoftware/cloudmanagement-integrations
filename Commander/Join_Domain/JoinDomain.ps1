@@ -50,6 +50,8 @@ if ($BypassCert -eq "Yes") {
     }
 "@
     [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 
+
 }
 
 #Get Auth Token
@@ -70,7 +72,7 @@ Try {
     $vmcred = Invoke-RestMethod -Method GET $vmcredurl -Headers $AuthHeader -ContentType 'application/json'
     $vmcreds = $vmcred.password_credential
     $vmusername = $vmcreds.username 
-    $vmpassword = $vmcreds.password | ConvertTo-SecureString -AsPlainText -Force
+    $vmpassword = ConvertTo-SecureString $vmcreds.password -AsPlainText -Force
     $vmcredential = New-Object System.Management.Automation.PSCredential($vmusername, $vmpassword)
 }
 Catch {
@@ -104,8 +106,8 @@ $result = invoke-command -session $session -ScriptBlock {
     #Set executionpolicy to bypass warnings in this session
     Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
     #Domain cred
-    $Domainpassword | ConvertTo-SecureString -AsPlainText -Force
-    $Domaincred = New-Object System.Management.Automation.PSCredential($Domainusername, $Domainpassword)
+    $Secpass = ConvertTo-SecureString $Domainpassword -AsPlainText -Force
+    $Domaincred = New-Object System.Management.Automation.PSCredential($Domainusername, $Secpass)
     #Join Domain
     try {
         $hostname = hostname
