@@ -58,7 +58,7 @@
       "type": "POWER",
       "condition": "#{target.state} -ne \"Not Running\"",
       "data": {
-        "power_action": "START_VM"
+        "power_action": "SHUTDOWN_GUEST_OS"
       }
     },
     {
