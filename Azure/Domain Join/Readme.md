@@ -4,7 +4,7 @@ These completion modules contain steps to Join a Windows Server to a Domain.
  - Requires PS module AZ on the Commander server. (https://learn.microsoft.com/en-us/powershell/azure/install-az-ps?view=azps-9.4.0) 
  - Commander 9.3.0 or higher
  - Advanced property "embotics.workflow.script.credentials" must be set to "true"
- - Azure Run Command Plugin for Commander (https://github.com/Embotics/Plug-in-Workflow-Steps/tree/master/azureruncmd)
+ - Azure Run Command Plugin for Commander (https://github.com/SnowSoftwareGlobal/cloudmanagement-integrations/tree/main/Commander/Plugins/azureruncmd)
 
 ## Changelog
 
