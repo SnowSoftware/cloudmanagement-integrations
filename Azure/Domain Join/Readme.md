@@ -1,4 +1,4 @@
-# Completion modules to connect to your Azure Subscriptions to enable XaaS Deployments
+# Completion modules to Domain Join Windows Servers in your Azure Subscription
 
 These completion modules contain steps to Join a Windows Server to a Domain.
  - Requires PS module AZ on the Commander server. (https://learn.microsoft.com/en-us/powershell/azure/install-az-ps?view=azps-9.4.0) 
