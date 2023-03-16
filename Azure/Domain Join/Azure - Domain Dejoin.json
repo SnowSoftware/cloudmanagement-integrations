@@ -1,0 +1,23 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Azure - Domain Dejoin",
+  "description": "This will run the remove computer command on the server and changes the computer object into a disconnected state in the domain.  This script does not delete the computer object from the domain so you will need to review your domain for disconnected objects.",
+  "type": "CHANGE_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [],
+  "info_messages": [],
+  "system_version": "9.3.0 (1009010124)",
+  "steps": [
+    {
+      "name": "",
+      "type": "RUNCOMMAND",
+      "condition": "",
+      "data": {
+        "sys_credentials": "",
+        "command": "$Username = \"%{provided_credential.username}\" \n$Password= \"%{provided_credential.password}\"\n$LocalHost = hostname\n\n#Credential Object \n[pscredential]$credential= New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \"$Username\",(\"$Password\" | ConvertTo-SecureString -AsPlainText -Force)  \n\nwrite-host \"[$LocalHost] will be dejoined from the domain\"\n\nRemove-Computer -UnjoinDomainCredential $Credential -force"
+      }
+    }
+  ]
+}

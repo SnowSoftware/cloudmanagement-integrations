@@ -1,0 +1,48 @@
+{
+  "id": "",
+  "guid": "",
+  "name": "Azure - Domain Join",
+  "description": "This will join a VM to your domain.\nDomain is Required\nOU is optional",
+  "type": "COMPONENT_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [
+    {
+      "name": "OU",
+      "variable": "OU",
+      "description": null,
+      "required": false,
+      "default_value": null
+    },
+    {
+      "name": "Domain",
+      "variable": "Domain",
+      "description": null,
+      "required": false,
+      "default_value": null
+    }
+  ],
+  "info_messages": [],
+  "system_version": "9.3.0 (1009010124)",
+  "steps": [
+    {
+      "name": "Wait for Server Azure Run to come online",
+      "type": "WAIT",
+      "condition": null,
+      "data": {
+        "failure_action": "PROCEED_TO_NEXT_STEP",
+        "wait_for_type": "ELAPSED_TIME",
+        "timeout": 30
+      }
+    },
+    {
+      "name": "Domain Join",
+      "type": "RUNCOMMAND",
+      "condition": null,
+      "data": {
+        "sys_credentials": "",
+        "command": "$Domain = \"#{inputVariable['Domain']}\"\n$OUPath = \"#{inputVariable['OU']}\"\n$Username = \"%{provided_credential.username}\" \n$Password= \"%{provided_credential.password}\"\n$LocalHost = hostname\n\n#Credential Object \n[pscredential]$credential= New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \"$Username\",(\"$Password\" | ConvertTo-SecureString -AsPlainText -Force)  \n\nif ($OUPath)\n    {\n        write-host \"[$localhost] will be joined to domain [$Domain] in OU path [$OU] and then [$localhost] will be restarted\"        \n        Add-Computer -DomainName $Domain -OUPath $OUPath -credential $Credential -restart -force\n    }\nelse\n    {\n        write-host \"[$localhost] will be joined to domain [$Domain] in your default OU and then [$localhost] will be restarted\"        \n        Add-Computer -DomainName $Domain -credential $Credential -restart -force\n    }\n\n\n"
+      }
+    }
+  ]
+}
