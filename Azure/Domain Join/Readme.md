@@ -11,8 +11,8 @@ These completion modules contain steps to Join a Windows Server to a Domain.
 **Version 1.0:** Initial version.
 
 ## Completion modules
-+ Join the VM to your Domain (Azure - Domain Join.json)
-+ De-Join your VM from the Domain (Azure - Domain Dejoin.json)
++ Join the VM to your Domain (Azure_-_Domain_Join_Completion_Module.json)
++ De-Join your VM from the Domain (Azure_-_Domain_Dejoin_Change_Completion_Module.json)
 
 ### Azure Windows VM Domain Join
 **Purpose:** 
