@@ -14,7 +14,7 @@ These completion modules contain steps to Join a Windows Server to a Domain.
 + Join the VM to your Domain (Azure - Domain Join.json)
 + De-Join your VM from the Domain (Azure - Domain Dejoin.json)
 
-### Azure Application Gateway Deploy and Destroy
+### Azure Windows VM Domain Join
 **Purpose:** 
 
 These set of modules allow you to Join an Azure hosted VM to your Domain.  This will allow you to join the machine in the OU of your choosing, if no OU is provided then it will join the server to the Domain in the default location (Generally OU=Computers,DC=<Domain>,DC=<Domain>)
