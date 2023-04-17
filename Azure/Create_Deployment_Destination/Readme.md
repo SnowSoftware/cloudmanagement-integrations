@@ -1,4 +1,4 @@
-# Commander - Enable creation of new deployment destinations via Service Portal
+# Commander Sample - Enable creation of a New Azure deployment destinations via Service Portal
 
 To create a new deployment destination to allow recently on-boarded customers to provision workloads effectively. This can be extended easily to have a dynamic list of appropriate resource groups based on selection.
 Please refer to https://docs.snowsoftware.com/commander/admin-portal/adding-dynamic-lists-to-forms.htm or contact your Snow representative to learn more.
@@ -9,6 +9,7 @@ These completion modules contain steps to create a deployment destination throug
  - Advanced property "embotics.workflow.credentials.commander" must be set to a "superuser" account to access the Commander API.
  - Advanced property "embotics.workflow.credentials.retrievesensitive" must be set to a "true".
  - Commander - Create a Deployment Destination (Module).json)
+ - Azure Cloud account must have an existing Resouce-Group, Subnet and Datastore. 
 
 
 **Workflows supporting this modules:**
