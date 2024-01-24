@@ -1,0 +1,32 @@
+{
+  "id": 743085,
+  "guid": "8bb5643f-540f-4165-bc9f-d96b2fddb6c8",
+  "name": "Github import - NEW",
+  "type": "CUSTOM_COMPLETION",
+  "change_description": null,
+  "fulfillment_rule": null,
+  "add_owner_as_admin": false,
+  "auto_deploy": false,
+  "users": [],
+  "organizations": [],
+  "target_type": null,
+  "info_messages": [],
+  "prompt_message": null,
+  "system_version": "9.6.1 (1009060084)",
+  "steps": [
+    {
+      "name": "New GitHub repo setup",
+      "type": "MODULE",
+      "condition": null,
+      "data": {
+        "GitRepoCustomAttribute": "GitRepoLocal",
+        "githubclonepath": "#{target.settings.inputField['Github Repo to clone']}",
+        "githubdefaultpath": "c:\\temp\\github",
+        "overrideexistingfiles": "no",
+        "module_name": "GitHub pull Request - NEW",
+        "BaseURL": "snowdemo.duri.lab",
+        "ByPassCert": ""
+      }
+    }
+  ]
+}

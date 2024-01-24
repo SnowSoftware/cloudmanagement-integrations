@@ -1,0 +1,71 @@
+{
+  "id": 742764,
+  "guid": "16a9afe8-fd50-45af-839b-649bc1290a08",
+  "name": "GitHub pull Request - NEW",
+  "description": null,
+  "type": "CUSTOM_COMPLETION",
+  "change_description": null,
+  "target_type": null,
+  "input_variables": [
+    {
+      "name": "ByPassCert",
+      "variable": "ByPassCert",
+      "description": null,
+      "required": false,
+      "default_value": "yes"
+    },
+    {
+      "name": "BaseURL",
+      "variable": "BaseURL",
+      "description": "the URL to your commander server",
+      "required": true,
+      "default_value": null
+    },
+    {
+      "name": "GitRepoCustomAttribute",
+      "variable": "GitRepoCustomAttribute",
+      "description": null,
+      "required": true,
+      "default_value": null
+    },
+    {
+      "name": "Github Path to Clone",
+      "variable": "githubclonepath",
+      "description": "This is the URL to the git repo.  Will look like:\n\nhttps://github.com/gitname/mygitrepo.git",
+      "required": true,
+      "default_value": null
+    },
+    {
+      "name": "Override existing Files",
+      "variable": "overrideexistingfiles",
+      "description": "Do you want to override the files in that repo already?\n\nDefault is no as you want to pull in a new repo",
+      "required": false,
+      "default_value": "no"
+    },
+    {
+      "name": "GitHub Default Local Path",
+      "variable": "githubdefaultpath",
+      "description": null,
+      "required": true,
+      "default_value": "c:\\temp\\github"
+    }
+  ],
+  "info_messages": [],
+  "system_version": "9.6.1 (1009060084)",
+  "steps": [
+    {
+      "name": "Clone GitHub Repo and add to Org default",
+      "type": "EMBEDDED_SCRIPT",
+      "condition": null,
+      "data": {
+        "credentials": null,
+        "failure_action": "FAIL_STEP",
+        "script_contents": "<# \nSnow Commander modules and workflow to capture your existing Github repository and to create a copy locally. This will then update a custom attribute pre created for the organisation  \nand allows to use that custom attribute in the future as part of workflows. \n \nPre Requisites \n \n* git-SCM for Windows installed onto your Snow Commander server to use the git commands \n* Local folder created where you want to store your git Repo's on your commander server (Default for testing is c:\\temp\\github) \n* Custom Attribute based on organization, by default this attribute is named GitRepoLocal \n* Guest OS Credential created for the organization you plan on connecting the repo to with a name and the password should be the Personal Access Token from GitHub  \n \n#> \n \n<# \nThis Section is all your variables.  You will notice no selected credentials is required. \n#> \n \n$Organization = \"#{request.requester.organization.name}\" \n$GitDefaultPath = \"#{inputVariable['githubdefaultpath']}\" \n$GitPathToClone = \"#{inputVariable['githubclonepath']}\"  \n$backslash = \"\\\" \n$GitPathSplit = ($GitPathToClone -split \"/\").split(\".\")[-2]  \n$GitNewFolder = $GitDefaultPath+$backslash+$Organization+$backslash+$GitPathSplit \n$OrganizationFolder = $GitDefaultPath+$backslash+$Organization \n$OverrideFiles = \"#{inputVariable['overrideexistingfiles']}\"  \n$User = (Get-Item Env:COMMANDER_CREDENTIALS_USERNAME).value;  \n$Pass = (Get-Item Env:COMMANDER_CREDENTIALS_PASSWORD).value; \n$PATUser = \"\" \n$PATPass = \"\"  \n$BaseURL = \"#{inputVariable['BaseURL']}\"  # set this as your commander server URL / DNS Entry aka server.domain.com. \n$BypassCert = \"#{inputVariable['ByPassCert']}\" \n$GitRepoAttribute = \"#{inputVariable['GitRepoCustomAttribute']}\" \n \n<# \nThis Section does the following: \n 1. Sets ignore invalid certificates if set to yes \n 2. Gets the Auth Token to your Commander Server \n 3. Pulls down your GitHub credentials that should have the same name as your Organization and stores the PAT Credentials \n 4. Create the Git Accesss Credentials string \n \n#> \n \n# 1. \nif ($BypassCert -eq \"yes\") {   \n    Write-host \"- Ignoring invalid Certificate\" -ForegroundColor Green   \n    add-type @\"   \n   using System.Net;   \n    using System.Security.Cryptography.X509Certificates;   \n    public class TrustAllCertsPolicy : ICertificatePolicy {   \n        public bool CheckValidationResult(   \n            ServicePoint srvPoint, X509Certificate certificate,   \n            WebRequest request, int certificateProblem) {   \n            return true;   \n        }   \n    }   \n\"@   \n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy   \n[Net.ServicePointManager]::Expect100Continue = $true   \n[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12   \n}   \n  \n# 2.    \n    $Token = $null    \n    $TokenEndpoint = \"/rest/v3/tokens\"    \n    $TokenURL = \"https://\"+$BaseURL+$TokenEndpoint    \n    $TokenBody = \"{    \n                \"\"username\"\": \"\"$user\"\",    \n                \"\"password\"\": \"\"$pass\"\"     \n                }\"    \n    $TokenResult = Invoke-RestMethod -Method POST $TokenURL -Body $TokenBody -ContentType 'application/json'    \n    $Token = $TokenResult.token    \n    $AuthHeader = @{\"Authorization\"= \"Bearer $Token\"}    \n \n# 3. \n \nTry{  \n    $credurl = \"https://\"+$BaseURL+\"/rest/v3/credentials/$Organization\"     \n    $cred = Invoke-RestMethod -Method GET $credurl -Headers $AuthHeader -ContentType 'application/json'  \n    $creds = $cred.password_credential  \n    $PATUser = $creds.username   \n    $PATpass = $creds.password  \n   }  \n    Catch{  \n        $Exception = \"$_\"  \n        Write-Error \"Failed to get the github credentials for [$Organization] from credentials in commander.. Does it exist?\"\n        Write-Error $Exception  \n        Exit 1     \n    } \n# 4. \n$GitPathwithPAT = $GitPathToClone.Replace(\"github.com\",\"$PATPass@github.com\") \n \n  \n<# \nWe will check if the folder already exists on the server. Two scenarios are covered here. \n \n 1. If the override is set to yes, and the folder exists, we notify you that the folder will be re-cloned, else, we will create the Organization folder \n in the default location you have nominated \n 2. We save the path into a variable for use later on \n 3. We will check if the folder already exists and override is set to yes, then delete and re clone, else if the folder does not exist \n and the override is set to no, we will go to the new org folder and clone the github repo, else, if the folder exist and override is set to no, exit script. \n \n#> \n \n# 1. \nif(test-path -path $GitNewFolder)  \n    {  \n        write-host \"Folder [$GitNewFolder] already Exists, If you selected to override content, the folder will be deleted and re-cloned\"  \n    }  \nelse  \n    {  \n        write-host \"Will create the new folder structure [$Organization] in [$GitDefaultPath]\"  \n        New-Item -ItemType Directory -Path $OrganizationFolder  \n    }  \n \n# 2. \n$ChildPathCheck = get-childitem -path $gitnewfolder -erroraction ignore\n\n# 3.  \nif($OverrideFiles -eq \"yes\")  \n{ \n$env:GIT_REDIRECT_STDERR = '2>&1' \ncd $OrganizationFolder  \n$GitFolder = $($OrganizationFolder)+\"\\.git\"  \nget-childitem -path $gitfolder -Recurse | remove-item -Confirm:$false -recurse -force  \nget-childitem -path $GitNewFolder -Recurse | remove-item -Confirm:$false -recurse -force  \nremove-item -Path $GitNewFolder -Recurse -Confirm:$false -force  \ngit clone $GitPathwithPAT  \n}  \nElseif(($ChildPathCheck -eq $null) -and ($OverrideFiles -eq \"no\"))  \n{  \n write-host \"Creating new folder for your github repo locally at [$GitNewFolder]\" \n $env:GIT_REDIRECT_STDERR = '2>&1' \n cd $OrganizationFolder \n git clone $GitPathwithPAT \n} \nelse \n{ \n    Write-host \"You have chosen not to override files. No changes have been commited to [$GitNewFolder]\"  \n    exit \n}  \n  \n<#   \nIn this section we will do the following: \n1. Refresh your token to Commander \n2. Update the Custom Attribute for the organisation as this is a new github repo to add, it should be an empty value. Else it will error and stop script. \n  \n#>  \n  \n# 1.  \n$refreshEndpoint = \"/rest/v3/tokens/refresh\"  \n$refreshURL = \"https://\"+$BaseURL+$refreshEndpoint  \n$refreshBody = \"{  \n            \"\"token\"\": \"\"$token\"\"  \n            }\"  \n$refreshResult = Invoke-RestMethod -Method POST $refreshURL -Body $refreshBody -ContentType 'application/json'  \n$Token = $refreshResult.token  \n$AuthHeader = @{\"Authorization\"= \"Bearer $Token\"}   \n \n# 2. \nTry{   \n    $Payload = [ordered]@{ \n    name = $GitRepoAttribute \n    value = $GitNewFolder \n    } \n    $PayLoad = $Payload | Convertto-json \n         write-host \"Will add the local folder to your organization as default for future github repo access requirements\" \n         $OrgCheck = \"https://\"+$BaseURL+\"/rest/v3/organizations/$organization/attributes\"  \n         $orgattributesdetails = Invoke-RestMethod -Method POST $orgcheck -Headers $AuthHeader -ContentType 'application/json' -body $payload \n         Write-Output \"Successfully updated the organization attribute for github\" \n \n    }  \n         Catch{   \n             $Exception = \"$_\"   \n             Write-Error \"Failed to associate the custom attribute to your organization. Please check that the value exists and is empty for [$Organization] \"   \n             Write-Error $Exception   \n             Exit 1   \n         }",
+        "script_arguments": "",
+        "timeout": 300,
+        "executable": "powershell.exe",
+        "capture_output": true
+      }
+    }
+  ]
+}
