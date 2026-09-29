@@ -7,6 +7,10 @@ This step makes uses of the AWS SSM toolkit and requires a set of prerequisites 
 
 **Version 1.0:** Initial version.
 
+**Version 2.0:** Upgraded from AWS SDK for Java v1 (`com.amazonaws:aws-java-sdk`) to AWS SDK for Java v2 (`software.amazon.awssdk`) for compatibility with Commander 9.10.0 and later. Shipped with Commander 9.10.3.
+
+> **Note:** Use version 2.0 with Commander 9.10.0 or later. For earlier Commander releases, use version 1.0.
+
 ## Plug-in steps in this package
 + Execute Guest OS Command (AWS)
 

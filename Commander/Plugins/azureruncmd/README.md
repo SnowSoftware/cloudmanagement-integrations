@@ -5,7 +5,12 @@ This package contains a Commander workflow plug-in step for running commands on 
 ## Change log
 
 **Version 1.0:** Initial version.
+
 **Version 1.3:** Updated for Commander 7.5 and supports credential variables.
+
+**Version 1.5:** Updated the Azure SDK version for compatibility with the version used in Commander 9.10.0 and later.
+
+> **Note:** Use version 1.5 with Commander 9.10.0 or later. For earlier Commander releases, use version 1.3.
 
 ## Plug-in steps in this package
 + Run Command
